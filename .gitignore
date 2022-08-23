@@ -110,3 +110,6 @@ transfer-gym/
 .idea/workspace.xml
 .idea/workspace.xml
 *.xml
+
+results
+wandb

@@ -7,4 +7,6 @@ env_args:
   num_landmarks: 3
 
   obs_last_action: False
-  
+
+test_npeisodes: 20
+test_interval: 2000

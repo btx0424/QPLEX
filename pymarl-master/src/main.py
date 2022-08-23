@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 import numpy as np
 import os
 import collections
@@ -12,6 +13,8 @@ from utils.logging import get_logger
 import yaml
 
 from run import run
+
+import wandb
 
 SETTINGS['CAPTURE_MODE'] = "fd" # set to "no" if you want to see stdout/stderr in console
 logger = get_logger()
@@ -32,6 +35,14 @@ def my_main(_run, _config, _log):
     config['env_args']['seed'] = config["seed"]
 
     # run the framework
+    wandb_config = SimpleNamespace(**config["wandb"])
+    wandb.init(
+        project=wandb_config.project,
+        entity=wandb_config.entity,
+        name=f"{wandb_config.name}/{config['env']}",
+        group="QPLEX",
+        config=config
+    )
     run(_run, config, _log)
 
 

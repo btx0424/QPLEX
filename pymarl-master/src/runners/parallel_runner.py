@@ -4,7 +4,8 @@ from components.episode_buffer import EpisodeBatch
 from multiprocessing import Pipe, Process
 import numpy as np
 import torch as th
-
+import wandb
+import logging
 
 # Based (very) heavily on SubprocVecEnv from OpenAI Baselines
 # https://github.com/openai/baselines/blob/master/baselines/common/vec_env/subproc_vec_env.py
@@ -14,7 +15,6 @@ class ParallelRunner:
         self.args = args
         self.logger = logger
         self.batch_size = self.args.batch_size_run
-
         # Make subprocesses for the envs
         self.parent_conns, self.worker_conns = zip(*[Pipe() for _ in range(self.batch_size)])
         env_fn = env_REGISTRY[self.args.env]
@@ -180,7 +180,7 @@ class ParallelRunner:
 
         cur_stats = self.test_stats if test_mode else self.train_stats
         cur_returns = self.test_returns if test_mode else self.train_returns
-        log_prefix = "test_" if test_mode else ""
+        log_prefix = "test/" if test_mode else "train/"
         infos = [cur_stats] + final_env_infos
         cur_stats.update({k: sum(d.get(k, 0) for d in infos) for k in set.union(*[set(d) for d in infos])})
         cur_stats["n_episodes"] = self.batch_size + cur_stats.get("n_episodes", 0)
@@ -190,6 +190,7 @@ class ParallelRunner:
 
         n_test_runs = max(1, self.args.test_nepisode // self.batch_size) * self.batch_size
         if test_mode and (len(self.test_returns) == n_test_runs):
+            logging.info(f"Logging test result over {n_test_runs} episodes: {np.mean(cur_returns)}, {cur_stats}")
             self._log(cur_returns, cur_stats, log_prefix)
         elif self.t_env - self.log_train_stats_t >= self.args.runner_log_interval:
             self._log(cur_returns, cur_stats, log_prefix)
@@ -200,6 +201,13 @@ class ParallelRunner:
         return self.batch
 
     def _log(self, returns, stats, prefix):
+        infos = {"env_step": self.t_env}
+        infos[prefix+"average_episode_return"] = np.mean(returns)
+        infos.update({
+            prefix + k: v / stats["n_episodes"] for k, v in stats.items() if k != "n_episodes"
+        })
+        wandb.log(infos)
+
         self.logger.log_stat(prefix + "return_mean", np.mean(returns), self.t_env)
         self.logger.log_stat(prefix + "return_std", np.std(returns), self.t_env)
         returns.clear()
