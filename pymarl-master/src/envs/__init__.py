@@ -1,4 +1,5 @@
 from functools import partial
+from math import prod
 # from smac.env import MultiAgentEnv, StarCraft2Env, Matrix_game1Env, Matrix_game2Env, Matrix_game3Env, mmdp_game1Env
 import sys
 import os
@@ -81,6 +82,7 @@ REGISTRY = {
     # "mmdp_game_1": partial(env_fn, env=mmdp_game1Env)
 }
 
+from gym import spaces
 class MPE(MultiAgentEnv):
     def __init__(self, **kwargs) -> None:
         super().__init__()
@@ -91,12 +93,27 @@ class MPE(MultiAgentEnv):
         self.episode_limit = self.env.world_length
         self.n_agents = len(self.env.agents)
 
-        self.n_actions = self.env.action_space[0].n
+        self.action_space = self.env.action_space[0]
+        if isinstance(self.action_space, spaces.Discrete):
+            self.n_actions = self.action_space.n
+            self.multidiscrete = False
+        else:
+            self.multidiscrete = True
+            self.nvec = self.action_space.high - self.action_space.low + 1
+            assert len(self.nvec) == 2
+            self.n_actions = prod(self.nvec)
 
     def reset(self):
         return self.env.reset()
     
     def step(self, actions):
+        if self.multidiscrete:
+            actions = np.concatenate([
+                np.eye(self.nvec[0])[actions//self.nvec[1]],
+                np.eye(self.nvec[1])[actions%self.nvec[1]]
+            ], axis=-1)
+        else:
+            actions = np.eye(self.n_actions)[actions]
         obs, reward, done, info = self.env.step(actions)
         reward = np.array(reward)
         return reward.mean(), np.array(done).any(), {}

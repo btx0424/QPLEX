@@ -2,7 +2,7 @@ env: football
 
 env_args:
   scenario_name: academy_3_vs_1_with_keeper
-  num_agents: 2
+  num_agents: 3
   use_stacked_frames: False
   representation: simple115v2
   rewards: "scoring,checkpoints"
